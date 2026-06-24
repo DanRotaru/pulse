@@ -1,6 +1,13 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 
+const props = defineProps({
+  authPassword: {
+    type: String,
+    required: true,
+  },
+})
+
 /*
  * MOCK DATA — single source of truth for the UI.
  * Replace this ref's contents from a backend later; the template is fully reactive.
@@ -117,6 +124,10 @@ function applyUsage(payload) {
 // Per-agent in-flight flag so the card can show it is refreshing.
 const loading = ref({ claude: false, codex: false })
 
+function authHeaders() {
+  return { 'x-dashboard-password': props.authPassword }
+}
+
 // A blank view shown while a refresh is in flight — clears stale numbers so it is
 // obvious a fresh fetch is happening rather than the old values lingering.
 function loadingView() {
@@ -134,7 +145,7 @@ async function refreshUsage(agent) {
   loading.value[agent] = true
   data.value[agent] = loadingView() // clear stale data before the request
   try {
-    const res = await fetch(`/api/usage/${agent}`)
+    const res = await fetch(`/api/usage/${agent}`, { headers: authHeaders() })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     data.value[agent] = toAgentView(await res.json())
   } catch (err) {
@@ -257,7 +268,7 @@ function connectSSE() {
 // immediately instead of waiting for the next 5-minute SSE broadcast.
 async function loadUsage() {
   try {
-    const res = await fetch('/api/usage')
+    const res = await fetch('/api/usage', { headers: authHeaders() })
     if (res.ok) applyUsage(await res.json())
   } catch (err) {
     console.error('Failed to load usage:', err)

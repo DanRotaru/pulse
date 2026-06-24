@@ -10,6 +10,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 const port = process.env.PORT || 3000;
+const DASHBOARD_PASSWORD = process.env.DASHBOARD_PASSWORD || '12345';
+const AUTH_COOKIE = 'dash_auth';
 // Bind to all network interfaces by default so the dashboard is reachable from
 // other devices on the same network (phones, tablets, other PCs on the WiFi).
 const host = process.env.HOST || '0.0.0.0';
@@ -25,14 +27,50 @@ function lanAddresses() {
 // SSE instance
 const sse = new SSE();
 
+function readCookie(req, name) {
+  const cookies = String(req.headers.cookie || '').split(';');
+  for (const cookie of cookies) {
+    const [key, ...value] = cookie.trim().split('=');
+    if (key === name) return decodeURIComponent(value.join('='));
+  }
+  return '';
+}
+
+function passwordFromRequest(req) {
+  return String(req.get('x-dashboard-password') || readCookie(req, AUTH_COOKIE) || '');
+}
+
+function isAuthorized(req) {
+  return passwordFromRequest(req) === DASHBOARD_PASSWORD;
+}
+
+function requireAuth(req, res, next) {
+  if (isAuthorized(req)) return next();
+  return res.status(401).json({ error: 'unauthorized' });
+}
+
+app.get('/api/auth', (req, res) => {
+  if (!isAuthorized(req)) {
+    res.clearCookie(AUTH_COOKIE);
+    return res.status(401).json({ ok: false });
+  }
+
+  res.cookie(AUTH_COOKIE, DASHBOARD_PASSWORD, {
+    httpOnly: true,
+    sameSite: 'strict',
+    maxAge: 365 * 24 * 60 * 60 * 1000,
+  });
+  res.json({ ok: true });
+});
+
 // Static files served from /public
 app.use(express.static(join(__dirname, 'public')));
 
 // SSE stream endpoint — clients connect via EventSource('/sse')
-app.get('/sse', sse.init);
+app.get('/sse', requireAuth, sse.init);
 
 // One-shot JSON endpoint (handy for debugging / polling clients)
-app.get('/api/stats', async (req, res, next) => {
+app.get('/api/stats', requireAuth, async (req, res, next) => {
   try {
     res.json(await collectStats());
   } catch (err) {
@@ -57,7 +95,7 @@ async function broadcastUsage() {
 }
 
 // Both agents at once — used for the client's initial load.
-app.get('/api/usage', async (req, res, next) => {
+app.get('/api/usage', requireAuth, async (req, res, next) => {
   try {
     if (!usageCache) usageCache = await collectUsage();
     res.json(usageCache);
@@ -69,7 +107,7 @@ app.get('/api/usage', async (req, res, next) => {
 // Single agent — triggered when the user clicks the Claude or Codex card. The
 // refreshed value is merged into the cache and re-broadcast so every client stays
 // in sync, then returned to the caller.
-app.get('/api/usage/:agent', async (req, res, next) => {
+app.get('/api/usage/:agent', requireAuth, async (req, res, next) => {
   const agent = String(req.params.agent || '');
   try {
     let data;
