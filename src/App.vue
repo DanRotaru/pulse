@@ -1,10 +1,6 @@
 <script setup>
 import { computed, nextTick, onMounted, ref } from 'vue'
-// Two layout variants. Switch the import below to compare:
-//   Dashboard       -> Claude & Codex stacked full-width (alternative)
-//   DashboardSplit  -> Claude & Codex side by side, 50% each (active)
-import DashboardSplit from './DashboardSplit.vue'
-// import Dashboard from './Dashboard.vue'
+import Dashboard from './Dashboard.vue'
 
 const PASSWORD_LENGTH = 5
 const STORAGE_KEY = 'dashboardPassword'
@@ -96,6 +92,20 @@ function onPaste(event, index) {
   applyDigits(event.clipboardData?.getData('text') || '', index)
 }
 
+async function logout() {
+  try {
+    await fetch('/api/auth', { method: 'DELETE' })
+  } catch (err) {
+    console.error('Failed to clear auth cookie:', err)
+  } finally {
+    localStorage.removeItem(STORAGE_KEY)
+    authPassword.value = ''
+    status.value = 'locked'
+    resetDigits()
+    window.location.reload()
+  }
+}
+
 onMounted(() => {
   const storedPassword = localStorage.getItem(STORAGE_KEY)
   if (storedPassword) {
@@ -107,8 +117,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <DashboardSplit v-if="isUnlocked" :auth-password="authPassword" />
-  <!-- <Dashboard /> -->
+  <Dashboard v-if="isUnlocked" :auth-password="authPassword" @logout="logout" />
   <main v-else class="auth-screen">
     <form class="auth-panel" @submit.prevent>
       <label class="auth-label" for="password-0">Password</label>
@@ -153,7 +162,6 @@ onMounted(() => {
   margin-bottom: 10px;
   color: var(--text);
   font-size: 18px;
-  font-style: italic;
 }
 
 .otp-row {
@@ -173,7 +181,9 @@ onMounted(() => {
   border-radius: 5px;
   background: #fff;
   color: var(--text);
-  font: 20px/1 inherit;
+  font: inherit;
+  font-size: 20px;
+  line-height: 1;
   text-align: center;
   font-variant-numeric: tabular-nums;
   outline: none;

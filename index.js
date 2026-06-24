@@ -63,6 +63,11 @@ app.get('/api/auth', (req, res) => {
   res.json({ ok: true });
 });
 
+app.delete('/api/auth', (req, res) => {
+  res.clearCookie(AUTH_COOKIE, { sameSite: 'strict' });
+  res.json({ ok: true });
+});
+
 // Static files served from /public
 app.use(express.static(join(__dirname, 'public')));
 
