@@ -16,15 +16,22 @@ const data = ref({
     fiveHour: { pct: 2, reset: '1h 58m' },
     weekly: { pct: 62, reset: '16h 36m', note: '28% reserve' },
   },
+  screenOnToday: '5h 23m',
   ram: { usedGB: 11.2, totalGB: 16 },
   cpu: { pct: 38, cores: 8, threads: 16 },
   topCpu: [
     { name: 'chrome.exe', pct: 22 },
     { name: 'Code.exe', pct: 14 },
+    { name: 'node.exe', pct: 9 },
+    { name: 'slack.exe', pct: 5 },
+    { name: 'Teams.exe', pct: 3 },
   ],
   topRam: [
     { name: 'Code.exe', gb: 2.4 },
     { name: 'chrome.exe', gb: 1.8 },
+    { name: 'Docker Desktop.exe', gb: 1.1 },
+    { name: 'slack.exe', gb: 0.9 },
+    { name: 'Teams.exe', gb: 0.7 },
   ],
 })
 
@@ -44,23 +51,92 @@ function toggleSeconds() {
   showSeconds.value = !showSeconds.value
   tick()
 }
+
+// Stopwatch timer
+const timerSeconds = ref(0)
+const timerRunning = ref(false)
+const timerDisplay = computed(() => {
+  const total = timerSeconds.value
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const s = total % 60
+  if (total < 60) return `${s}s`
+  if (h === 0) return `${m}m ${s}s`
+  return `${h}h ${m}m ${s}s`
+})
+function toggleTimer() {
+  timerRunning.value = !timerRunning.value
+}
+function resetTimer() {
+  timerRunning.value = false
+  timerSeconds.value = 0
+}
+
+// Tap = play/pause, hold 1s = reset (with top progress bar)
+const HOLD_MS = 1000
+const holdProgress = ref(0)
+let holdRaf = null
+let holdStart = 0
+let holdFired = false
+
+function startHold() {
+  holdFired = false
+  holdStart = performance.now()
+  const step = (now) => {
+    const p = Math.min((now - holdStart) / HOLD_MS, 1)
+    holdProgress.value = p
+    if (p >= 1) {
+      holdFired = true
+      resetTimer()
+      holdProgress.value = 0
+      holdRaf = null
+      return
+    }
+    holdRaf = requestAnimationFrame(step)
+  }
+  holdRaf = requestAnimationFrame(step)
+}
+function endHold() {
+  if (holdRaf) {
+    cancelAnimationFrame(holdRaf)
+    holdRaf = null
+  }
+  holdProgress.value = 0
+  if (!holdFired) toggleTimer() // short press → play/pause
+  holdFired = false
+}
+function cancelHold() {
+  if (holdRaf) {
+    cancelAnimationFrame(holdRaf)
+    holdRaf = null
+  }
+  holdProgress.value = 0
+  holdFired = false
+}
+
 onMounted(() => {
   tick()
-  timer = setInterval(tick, 1000)
+  timer = setInterval(() => {
+    tick()
+    if (timerRunning.value) timerSeconds.value++
+  }, 1000)
 })
-onUnmounted(() => clearInterval(timer))
+onUnmounted(() => {
+  clearInterval(timer)
+  if (holdRaf) cancelAnimationFrame(holdRaf)
+})
 </script>
 
 <template>
   <div class="screen">
     <header class="head">
-      <h1>System Dashboard</h1>
+      <h1>Dan's System Dashboard</h1>
       <button class="time" type="button" @click="toggleSeconds">{{ clock }}</button>
     </header>
 
-    <!-- 1 & 2. Claude + Codex usage as two 50% cards -->
-    <div class="grid">
-      <!-- Claude -->
+    <div class="board">
+      <div class="usage-group">
+      <!-- 1. Claude -->
       <section class="card usage">
         <div class="card-top">
           <div class="card-title">
@@ -95,7 +171,7 @@ onUnmounted(() => clearInterval(timer))
         </div>
       </section>
 
-      <!-- Codex -->
+      <!-- 2. Codex -->
       <section class="card usage">
         <div class="card-top">
           <div class="card-title">
@@ -129,10 +205,50 @@ onUnmounted(() => clearInterval(timer))
           </div>
         </div>
       </section>
-    </div>
 
-    <!-- 3 & 4. RAM / CPU -->
-    <div class="grid">
+      <!-- Screen on time today -->
+      <section class="card today">
+        <span class="today-label">Screen on today</span>
+        <span class="today-val">{{ data.screenOnToday }}</span>
+      </section>
+
+      <!-- Stopwatch timer: tap card = play/pause, hold 2s = reset -->
+      <section
+        class="card timer"
+        :class="{ running: timerRunning }"
+        role="button"
+        tabindex="0"
+        :aria-label="timerRunning ? 'Pause (hold to reset)' : 'Play (hold to reset)'"
+        @pointerdown.prevent="startHold"
+        @pointerup="endHold"
+        @pointerleave="cancelHold"
+        @contextmenu.prevent
+      >
+        <div class="timer-progress" :style="{ width: holdProgress * 100 + '%' }" />
+        <div class="timer-val">{{ timerDisplay }}</div>
+      </section>
+      </div>
+
+      <!-- 3 & 5. CPU + its top processes -->
+      <div class="stat">
+        <div class="stat-head">
+          <span class="stat-label">CPU</span>
+          <span class="dot" style="background: var(--cpu)" />
+        </div>
+        <div class="stat-value">{{ data.cpu.pct }}<small> %</small></div>
+        <div class="bar">
+          <span :style="{ width: data.cpu.pct + '%', background: 'var(--cpu)' }" />
+        </div>
+        <div class="stat-sub">{{ data.cpu.cores }} cores · {{ data.cpu.threads }} threads</div>
+        <ul class="proc-list">
+          <li v-for="p in data.topCpu" :key="p.name">
+            <span class="proc-name">{{ p.name }}</span>
+            <span class="proc-val" style="color: var(--cpu)">{{ p.pct }}%</span>
+          </li>
+        </ul>
+      </div>
+
+      <!-- 4 & 6. RAM + its top processes -->
       <div class="stat">
         <div class="stat-head">
           <span class="stat-label">RAM</span>
@@ -145,48 +261,14 @@ onUnmounted(() => clearInterval(timer))
           <span :style="{ width: ramPct + '%', background: 'var(--ram)' }" />
         </div>
         <div class="stat-sub">{{ ramPct }}% used</div>
-      </div>
-
-      <div class="stat">
-        <div class="stat-head">
-          <span class="stat-label">CPU</span>
-          <span class="dot" style="background: var(--cpu)" />
-        </div>
-        <div class="stat-value">{{ data.cpu.pct }}<small> %</small></div>
-        <div class="bar">
-          <span :style="{ width: data.cpu.pct + '%', background: 'var(--cpu)' }" />
-        </div>
-        <div class="stat-sub">{{ data.cpu.cores }} cores · {{ data.cpu.threads }} threads</div>
+        <ul class="proc-list">
+          <li v-for="p in data.topRam" :key="p.name">
+            <span class="proc-name">{{ p.name }}</span>
+            <span class="proc-val" style="color: var(--ram)">{{ p.gb }} GB</span>
+          </li>
+        </ul>
       </div>
     </div>
-
-    <!-- 5. Top 3 CPU processes -->
-    <section class="proc-card">
-      <div class="proc-head">
-        <div class="proc-icon" style="background: #eaf1ff; color: var(--cpu)">⚡</div>
-        <span class="proc-title">Top CPU processes</span>
-      </div>
-      <ul class="proc-list">
-        <li v-for="p in data.topCpu" :key="p.name">
-          <span class="proc-name">{{ p.name }}</span>
-          <span class="proc-val" style="color: var(--cpu)">{{ p.pct }}%</span>
-        </li>
-      </ul>
-    </section>
-
-    <!-- 6. Top 3 RAM processes -->
-    <section class="proc-card">
-      <div class="proc-head">
-        <div class="proc-icon" style="background: #e7f7ef; color: var(--ram)">▣</div>
-        <span class="proc-title">Top RAM processes</span>
-      </div>
-      <ul class="proc-list">
-        <li v-for="p in data.topRam" :key="p.name">
-          <span class="proc-name">{{ p.name }}</span>
-          <span class="proc-val" style="color: var(--ram)">{{ p.gb }} GB</span>
-        </li>
-      </ul>
-    </section>
   </div>
 </template>
 
@@ -199,6 +281,13 @@ onUnmounted(() => clearInterval(timer))
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+/* Landscape: use the full width and lay cards out in 4 columns */
+@media (orientation: landscape) {
+  .screen {
+    max-width: 1100px;
+  }
 }
 
 .head {
@@ -226,11 +315,92 @@ onUnmounted(() => clearInterval(timer))
   user-select: none;
 }
 
-.grid {
+/* Card board: stacked in portrait, 4 columns in landscape (Claude | Codex | CPU | RAM) */
+.board {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  align-items: start;
+}
+@media (orientation: landscape) {
+  .board {
+    grid-template-columns: 150px 150px 1fr 1fr;
+  }
+}
+
+/* Claude + Codex side by side, with the today / timer cards beneath them */
+.usage-group {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
-  align-items: stretch;
+  align-content: start;
+  min-width: 0;
+}
+@media (orientation: landscape) {
+  .usage-group {
+    grid-column: span 2;
+  }
+}
+
+/* Screen-on-today card (compact) */
+.today {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px 13px;
+  width: 120px;
+}
+.today-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.today-val {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Stopwatch timer card — whole card is the control (tap = play/pause, hold = reset) */
+.timer {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 13px;
+  cursor: pointer;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  position: relative;
+  left: -30px;
+  width: calc(100% + 30px);
+}
+.timer:focus,
+.timer:focus-visible {
+  outline: none;
+  background: var(--card);
+}
+/* Hold-to-reset progress bar across the top of the card */
+.timer-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 3px;
+  width: 0;
+  background: var(--ram);
+  border-top-left-radius: 16px;
+}
+.timer-val {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  font-variant-numeric: tabular-nums;
+  position: relative;
+  top: -5px;
 }
 
 /* Usage cards (compact, side by side) */
@@ -324,6 +494,7 @@ onUnmounted(() => clearInterval(timer))
   display: flex;
   flex-direction: column;
   gap: 8px;
+  width: 140px;
 }
 .stat-head {
   display: flex;
@@ -349,54 +520,27 @@ onUnmounted(() => clearInterval(timer))
 .stat-sub {
   font-size: 11px;
   color: var(--muted);
+  white-space: nowrap;
 }
 
-/* Top process cards (top 3 each) */
-.proc-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 12px 14px;
-}
-.proc-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-.proc-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 9px;
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-}
-.proc-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--muted);
-}
+/* Top processes — inline list inside the CPU / RAM cards */
 .proc-list {
   list-style: none;
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 2px;
 }
 .proc-list li {
-  min-width: 0;
   display: flex;
   align-items: baseline;
-  gap: 5px;
-  padding: 7px 9px;
-  border-radius: 9px;
-  background: var(--track);
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
 }
 .proc-name {
   min-width: 0;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: -0.2px;
   white-space: nowrap;
@@ -404,7 +548,7 @@ onUnmounted(() => clearInterval(timer))
   text-overflow: ellipsis;
 }
 .proc-val {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   flex: none;
