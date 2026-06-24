@@ -1,0 +1,34 @@
+:root {
+  --bg: #ffffff;
+  --card: #ffffff;
+  --border: #ececf0;
+  --track: #e9e9ef;
+  --text: #1c1c22;
+  --muted: #8a8a96;
+  --claude: #d97757;
+  --codex: #7c5cff;
+  --ram: #2bb673;
+  --cpu: #3b82f6;
+  --badge-bg: #e7f7ef;
+  --badge-text: #1f9d63;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
