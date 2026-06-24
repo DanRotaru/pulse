@@ -11,7 +11,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 const port = process.env.PORT || 3000;
 const DASHBOARD_PASSWORD = process.env.DASHBOARD_PASSWORD || '12345';
-const AUTH_COOKIE = 'dash_auth';
+const AUTH_COOKIE = 'pulseAuth';
 // Bind to all network interfaces by default so the dashboard is reachable from
 // other devices on the same network (phones, tablets, other PCs on the WiFi).
 const host = process.env.HOST || '0.0.0.0';

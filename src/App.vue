@@ -3,7 +3,7 @@ import { computed, nextTick, onMounted, ref } from 'vue'
 import Dashboard from './Dashboard.vue'
 
 const PASSWORD_LENGTH = 5
-const STORAGE_KEY = 'dashboardPassword'
+const STORAGE_KEY = 'pulseAuth'
 
 const digits = ref(Array(PASSWORD_LENGTH).fill(''))
 const inputRefs = ref([])

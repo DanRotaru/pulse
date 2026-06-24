@@ -1,5 +1,5 @@
 {
-  "name": "dash",
+  "name": "pulse",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -7,8 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "node index",
-    "start:watch": "nodemon index"
+    "start": "node --env-file-if-exists=.env index",
+    "start:watch": "nodemon --exec \"node --env-file-if-exists=.env\" index"
   },
   "dependencies": {
     "vue": "^3.5.38",
@@ -25,7 +25,7 @@
   "engines": {
     "node": "^22.18.0 || >=24.12.0"
   },
-  "description": "This template should help get you started developing with Vue 3 in Vite.",
+  "description": "Real-time dashboard for system metrics (CPU/RAM) and Claude/Codex AI usage, streamed over SSE.",
   "main": "vite.config.js",
   "keywords": [],
   "author": "",
