@@ -156,7 +156,7 @@ onUnmounted(() => clearInterval(timer))
       <div class="proc-icon" style="background: #eaf1ff; color: var(--cpu)">⚡</div>
       <div class="proc-body">
         <div class="proc-label">Top CPU process</div>
-        <div class="proc-name">{{ data.topCpu.name }}</div>
+        <div class="proc-name" :title="data.topCpu.name">{{ data.topCpu.name }}</div>
       </div>
       <div class="proc-val" style="color: var(--cpu)">{{ data.topCpu.pct }}%</div>
     </div>
@@ -166,7 +166,7 @@ onUnmounted(() => clearInterval(timer))
       <div class="proc-icon" style="background: #e7f7ef; color: var(--ram)">▣</div>
       <div class="proc-body">
         <div class="proc-label">Top RAM process</div>
-        <div class="proc-name">{{ data.topRam.name }}</div>
+        <div class="proc-name" :title="data.topRam.name">{{ data.topRam.name }}</div>
       </div>
       <div class="proc-val" style="color: var(--ram)">{{ data.topRam.gb }} GB</div>
     </div>
